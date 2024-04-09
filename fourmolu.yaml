@@ -1,5 +1,5 @@
 # Generated from web app, for more information, see: https://fourmolu.github.io/config/
-indentation: 4
+indentation: 2
 column-limit: none
 function-arrows: trailing
 comma-style: leading
@@ -10,7 +10,7 @@ newlines-between-decls: 1
 haddock-style: single-line
 haddock-style-module: null
 let-style: auto
-in-style: right-align
+in-style: left-align
 single-constraint-parens: auto
 single-deriving-parens: never
 unicode: never
