@@ -8,6 +8,13 @@ import Paths_nix_snow (version)
 import Text.ANSI (bold, underline)
 import Text.InterpolatedString.QM (qmb)
 
+-- Helper functions
+succeedWith :: IO () -> IO ()
+succeedWith action = action >> exitSuccess
+
+failWith :: IO () -> IO ()
+failWith action = action >> exitFailure
+
 main :: IO ()
 main = do
   let
@@ -30,16 +37,30 @@ main = do
 
   case () of
     _
-      | "--help" `elem` args || "-h" `elem` args -> printHelp
-      | "--version" `elem` args || "-v" `elem` args -> putStrLn ("nix-snow " <> showVersion version)
+      -- Help
+      | "--help" `elem` args || "-h" `elem` args -> succeedWith printHelp
+      -- Version
+      | "--version" `elem` args || "-v" `elem` args -> succeedWith $ putStrLn ("nix-snow " <> showVersion version)
+      -- Subcommands
       | otherwise -> case () of
           _
-            | "add" `elem` args ->
+            -- Add package
+            | Just "add" == viaNonEmpty head args ->
                 let
-                  packages = filter (/= "add") args
+                  packages = fromMaybe [] (viaNonEmpty tail args)
                 in
                   if null packages
-                    then putStrLn "No packages specified, use 'nix-snow add <package(s)>'" >> exitFailure
-                    else print packages
-            | "remove" `elem` args -> putStrLn "remove"
-            | otherwise -> printHelp
+                    then failWith $ putStrLn "No packages specified, use 'nix-snow add <package(s)>'"
+                    else succeedWith $ print packages
+            -- Remove package
+            | Just "remove" == viaNonEmpty head args ->
+                let
+                  packages = fromMaybe [] (viaNonEmpty tail args)
+                in
+                  if null packages
+                    then failWith $ putStrLn "No packages specified, use 'nix-snow remove <package(s)>'"
+                    else succeedWith $ print packages
+            -- Alias for help
+            | "help" `elem` args -> succeedWith printHelp
+            -- Fail for anything invalid
+            | otherwise -> failWith printHelp

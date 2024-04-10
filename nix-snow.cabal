@@ -14,8 +14,8 @@ executable nix_snow
   main-is:          Main.hs
   build-depends:
     , base
-    , interpolate
     , qm-interpolated-string
+    , split
     , relude
     , text-ansi
 
