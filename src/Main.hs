@@ -32,6 +32,14 @@ main = do
     _
       | "--help" `elem` args || "-h" `elem` args -> printHelp
       | "--version" `elem` args || "-v" `elem` args -> putStrLn ("nix-snow " <> showVersion version)
-      | "add" `elem` args -> putStrLn "add"
-      | "remove" `elem` args -> putStrLn "remove"
-      | otherwise -> printHelp
+      | otherwise -> case () of
+          _
+            | "add" `elem` args ->
+                let
+                  packages = filter (/= "add") args
+                in
+                  if null packages
+                    then putStrLn "No packages specified, use 'nix-snow add <package(s)>'" >> exitFailure
+                    else print packages
+            | "remove" `elem` args -> putStrLn "remove"
+            | otherwise -> printHelp
