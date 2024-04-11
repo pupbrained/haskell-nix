@@ -1,66 +1,70 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 module Main where
 
+import Add (addPackage)
 import Data.Version (showVersion)
+import Options.Applicative (
+  Parser,
+  ParserInfo,
+  command,
+  customExecParser,
+  flag,
+  fullDesc,
+  help,
+  helper,
+  info,
+  long,
+  metavar,
+  option,
+  prefs,
+  progDesc,
+  short,
+  showDefault,
+  showHelpOnError,
+  str,
+  strArgument,
+  subparser,
+  value,
+ )
 import Paths_nix_snow (version)
-import Text.ANSI (bold, underline)
-import Text.InterpolatedString.QM (qmb)
+import Utils (succeedWith)
 
--- Helper functions
-succeedWith :: IO () -> IO ()
-succeedWith action = action >> exitSuccess
+data Opts = Opts
+  { optVersion :: Bool
+  , optOutput :: FilePath
+  , optCommand :: Command
+  }
 
-failWith :: IO () -> IO ()
-failWith action = action >> exitFailure
+data Command
+  = Add [String]
+  | Remove [String]
+
+optsParser :: ParserInfo Opts
+optsParser =
+  info (parser <**> helper) $
+    mconcat
+      [ fullDesc
+      , progDesc "Manage nix packages"
+      ]
+  where
+    parser :: Parser Opts
+    parser =
+      Opts
+        <$> flag False True (long "version" <> short 'v' <> help "Print version information")
+        <*> option str (long "output" <> short 'o' <> metavar "FILE" <> help "Output file" <> value "./snowpkgs.nix" <> showDefault)
+        <*> subparser
+          ( command "add" (info (Add <$> many (strArgument (metavar "PACKAGES"))) (progDesc "Add a package"))
+              <> command "remove" (info (Remove <$> many (strArgument (metavar "PACKAGES"))) (progDesc "Remove a package"))
+          )
 
 main :: IO ()
 main = do
-  let
-    printHelp =
-      putStrLn
-        [qmb| 
-          {bold $ underline "Usage:"} {bold "nix-snow"} [options] <command>
+  opts <- customExecParser (prefs showHelpOnError) optsParser
 
-          {bold $ underline "Commands:"}
-          \  {bold "add"}     Add a package
-          \  {bold "remove"}  Remove a package
-          \  {bold "help"}    Print this help and exit
+  when (optVersion opts) $ do
+    succeedWith $ putStrLn ("nix-snow " <> showVersion version)
 
-          {bold $ underline "Options:"}
-          \  {bold "-h, --help"}     Print this help and exit
-          \  {bold "-v, --version"}  Print version information and exit
-        |]
-
-  args <- getArgs
-
-  case () of
-    _
-      -- Help
-      | "--help" `elem` args || "-h" `elem` args -> succeedWith printHelp
-      -- Version
-      | "--version" `elem` args || "-v" `elem` args -> succeedWith $ putStrLn ("nix-snow " <> showVersion version)
-      -- Subcommands
-      | otherwise -> case () of
-          _
-            -- Add package
-            | Just "add" == viaNonEmpty head args ->
-                let
-                  packages = fromMaybe [] (viaNonEmpty tail args)
-                in
-                  if null packages
-                    then failWith $ putStrLn "No packages specified, use 'nix-snow add <package(s)>'"
-                    else succeedWith $ print packages
-            -- Remove package
-            | Just "remove" == viaNonEmpty head args ->
-                let
-                  packages = fromMaybe [] (viaNonEmpty tail args)
-                in
-                  if null packages
-                    then failWith $ putStrLn "No packages specified, use 'nix-snow remove <package(s)>'"
-                    else succeedWith $ print packages
-            -- Alias for help
-            | "help" `elem` args -> succeedWith printHelp
-            -- Fail for anything invalid
-            | otherwise -> failWith printHelp
+  case optCommand opts of
+    Add packages -> Add.addPackage packages (optOutput opts)
+    Remove packages -> putStrLn $ "Removing packages: " <> show packages
