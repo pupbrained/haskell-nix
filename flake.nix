@@ -50,6 +50,12 @@
             # Enabled by default
             # enable = true;
 
+            mkShellArgs = {
+              shellHook = ''
+                export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${pkgs.zlib}/lib
+              '';
+            };
+
             # Programs you want to make available in the shell.
             # Default programs can be disabled by setting to 'null'
             tools = hp: {

@@ -3,30 +3,41 @@
 
 module Add where
 
-import System.Process.Typed
+import System.Process.Typed (
+  ExitCode (ExitSuccess),
+  closed,
+  proc,
+  runProcess,
+  setStderr,
+  setStdout,
+ )
 import Text.InterpolatedString.QM (qmb)
 import Utils (failWith, succeedWith, toNixArray)
 
-validatePackage :: String -> IO Bool
+validatePackage :: String -> IO (Bool, Maybe String)
 validatePackage package = do
-  -- FIXME: this breaks nix
-  exitCode <- runProcess $ setStdout closed (proc "nix" ["search", package, "--json"])
+  exitCode <-
+    runProcess $
+      setStdout closed $
+        setStderr closed (proc "nix-instantiate" ["--eval", "-E", "(import <nixpkgs> {})." <> package <> ".pname"])
+
   case exitCode of
-    ExitSuccess -> return True
-    _ -> return False
+    ExitSuccess -> return (True, Nothing)
+    _ -> return (False, Just package)
 
 addPackage :: [String] -> FilePath -> IO ()
 addPackage packages output = do
   validatePackages <- mapM validatePackage packages
 
-  -- if any of the packages don't exist, fail
-  unless (or validatePackages) $ do
-    failWith $ putStrLn "One or more packages don't exist"
-
-  let strToWrite =
-        [qmb|
-          \{pkgs, ...}: \{
-          \  snowPkgs = with pkgs; {toNixArray $ sort packages};
-          }
-        |]
-   in succeedWith $ writeFile output strToWrite
+  case filter (not . fst) validatePackages of
+    [] -> do
+      let strToWrite =
+            [qmb|
+              \{pkgs, ...}: \{
+              \  snowPkgs = with pkgs; {toNixArray $ sort packages};
+              }
+            |]
+       in succeedWith $ writeFile output strToWrite
+    invalidPackages -> failWith $ do
+      putStrLn "Invalid packages:"
+      mapM_ (putStrLn . fromMaybe "" . snd) invalidPackages
